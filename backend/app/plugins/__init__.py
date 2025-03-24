@@ -6,6 +6,8 @@ This package contains the plugin system for the Construction AI Platform.
 
 # Import all plugin packages to register them with the registry
 import app.plugins.mep
+import app.plugins.structural
+import app.plugins.cost
 
 # Import registry functions for easy access
 from app.plugins.registry import (
