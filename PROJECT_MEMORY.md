@@ -22,29 +22,35 @@ The Construction AI Platform is an AI-powered solution for construction plan ana
   - Document listing page with grid/list views
   - Document upload functionality
   - Document viewer with AI analysis results
+- **Projects Management**:
+  - Projects listing page with sorting and filtering
+  - Project creation functionality
+  - Project details page with tasks, milestones, documents, and estimations
 
 #### Backend
 - Basic API structure with FastAPI
 - HostGator deployment configuration
 
 ### In-Progress Features
-- Document Viewer implementation (partially completed)
 - Integration between frontend and backend services
+- Estimations functionality implementation
+- AI models for document processing
 
 ### Next Steps
-- Complete Document Viewer implementation
-- Implement Projects page for managing construction projects
-- Implement Estimations functionality for cost calculations
+- Implement Estimations page for cost calculations
+- Implement Plugins management
 - Add comprehensive API endpoints for document processing
 - Develop AI models for element detection and measurement extraction
+- Implement Settings page for user and application configurations
 
 ## Development Decisions
 
 ### 2025-03-24
 - Decided to focus on the main `construction-ai-platform` repository rather than the newly created `construction-ai-platform-app`
-- Implemented Documents page with grid/list views
-- Added DocumentUploadForm component with file upload capabilities
-- Started implementing DocumentViewer for processing results visualization
+- Implemented memory tracking with PROJECT_MEMORY.md and PROJECT_PLAN.md
+- Implemented Documents page with grid/list views and DocumentUploadForm component
+- Implemented DocumentViewer for processing results visualization
+- Implemented Projects and ProjectDetails pages with comprehensive project management features
 
 ## Known Issues
 - Need to connect frontend components to actual backend services instead of mock data
@@ -54,9 +60,11 @@ The Construction AI Platform is an AI-powered solution for construction plan ana
 ## Questions and Clarifications
 - Confirm deployment strategy for both frontend and backend on HostGator
 - Determine priority for next feature implementation
+- Clarify AI model integration approach
 
 ## Tech Stack Decisions
 - Using React Query for data fetching
 - Using ShadCN UI components for consistent design
 - Using Tailwind CSS for styling
 - Using FastAPI for backend services
+- Using Jotai for state management
