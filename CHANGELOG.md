@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Elements API for managing construction elements
+  - CRUD operations for elements
+  - Filtering by project, document, and type
+  - Statistics and analytics endpoints
+- Quote generation system
+  - Quote creation and management
+  - Quote items from elements
+  - Quote status workflow (draft, sent, accepted, declined)
+  - Quote activities for audit trail
+  - PDF generation service (placeholder)
 - Subscription management system
   - Organization model for multi-user environments
   - Multiple subscription plans (Free, Starter, Essential, Professional, Advanced, Ultimate)
@@ -32,7 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated document upload endpoint to check subscription limits
 - Updated document analysis endpoint to track usage
 - Enhanced User model to include organization relationship
-- Improved API router to include subscription endpoints
+- Improved API router to include subscription, elements, and quotes endpoints
+- Updated config with PDF output directory and additional settings
 
 ### Fixed
 - None
