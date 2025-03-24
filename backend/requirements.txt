@@ -1,50 +1,23 @@
-# FastAPI and dependencies
-fastapi>=0.95.0
-uvicorn>=0.21.1
-python-multipart>=0.0.6
-pydantic>=1.10.7
-pydantic-settings>=2.0.0
-email-validator>=2.0.0
-
-# Database
-sqlalchemy>=2.0.9
-alembic>=1.10.3
-mysql-connector-python>=8.0.32
-pymysql>=1.0.3
-
-# Security
-python-jose>=3.3.0
-passlib>=1.7.4
-bcrypt>=4.0.1
-
-# AI/ML dependencies
-tensorflow>=2.12.0
-pylsd-nova>=1.2.0
-opencv-python>=4.7.0.72
-pytesseract>=0.3.10
-numpy>=1.23.5
-pandas>=2.0.0
-scipy>=1.10.1
-matplotlib>=3.7.1
-
-# File handling
-python-magic>=0.4.27
-pyodbc>=4.0.39
-
-# PDF processing
-pypdf2>=3.0.1
-reportlab>=3.6.13
-
-# CAD/BIM processing
-IfcOpenShell>=0.7.0
-oom-linalg>=0.6.12
-
-# Testing
-pytest>=7.3.1
-pytest-cov>=4.1.0
-
-# Utilities
-python-dotenv>=1.0.0
-tenacity>=8.2.2
-jinja2>=3.1.2
-aiofiles>=23.1.0
+fastapi==0.103.1
+uvicorn==0.23.2
+sqlalchemy==2.0.20
+pydantic==2.3.0
+pydantic[email]==2.3.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+alembic==1.12.0
+psycopg2-binary==2.9.7
+pytest==7.4.2
+httpx==0.25.0
+numpy==1.25.2
+python-dotenv==1.0.0
+Pillow==10.0.1
+pdf2image==1.16.3
+PyPDF2==3.0.1
+pytesseract==0.3.10
+scikit-learn==1.3.0
+transformers==4.33.1
+langchain==0.0.286
+openai==0.28.0
+tiktoken==0.5.1
