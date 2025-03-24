@@ -26,6 +26,10 @@ The Construction AI Platform is an AI-powered solution for construction plan ana
   - Projects listing page with sorting and filtering
   - Project creation functionality
   - Project details page with tasks, milestones, documents, and estimations
+- **Estimations Management**:
+  - Estimations listing page with sorting and filtering
+  - Estimation creation functionality
+  - Estimation details page with summary, line items, and notes
 
 #### Backend
 - Basic API structure with FastAPI
@@ -33,15 +37,14 @@ The Construction AI Platform is an AI-powered solution for construction plan ana
 
 ### In-Progress Features
 - Integration between frontend and backend services
-- Estimations functionality implementation
 - AI models for document processing
 
 ### Next Steps
-- Implement Estimations page for cost calculations
 - Implement Plugins management
 - Add comprehensive API endpoints for document processing
 - Develop AI models for element detection and measurement extraction
 - Implement Settings page for user and application configurations
+- Add notifications system for project and estimation updates
 
 ## Development Decisions
 
@@ -51,6 +54,7 @@ The Construction AI Platform is an AI-powered solution for construction plan ana
 - Implemented Documents page with grid/list views and DocumentUploadForm component
 - Implemented DocumentViewer for processing results visualization
 - Implemented Projects and ProjectDetails pages with comprehensive project management features
+- Implemented Estimations and EstimationDetails pages with cost estimation functionality
 
 ## Known Issues
 - Need to connect frontend components to actual backend services instead of mock data
