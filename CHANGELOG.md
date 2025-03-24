@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- MEP (Mechanical, Electrical, Plumbing) plugins
+  - Electrical Systems Estimator plugin
+  - Plumbing Systems Estimator plugin
+  - HVAC & Mechanical Estimator plugin
 - Elements API for managing construction elements
   - CRUD operations for elements
   - Filtering by project, document, and type
