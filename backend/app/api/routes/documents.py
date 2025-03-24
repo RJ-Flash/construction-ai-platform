@@ -6,7 +6,7 @@ import shutil
 from datetime import datetime
 
 from ...db.database import get_db
-from ...db.models import Document, Project
+from ...db.models import Document, Project, User
 from ...schemas import (
     Document as DocumentSchema, 
     DocumentCreate, 
@@ -16,9 +16,10 @@ from ...schemas import (
     DocumentAnalysisResponse,
     User as UserSchema
 )
-from ...core.auth import get_current_active_user
+from ...core.security import get_current_active_user
 from ...core.config import settings
 from ...services.document_analysis import DocumentAnalysisService
+from ...services.subscription_service import SubscriptionService
 
 router = APIRouter()
 
@@ -28,7 +29,7 @@ async def read_documents(
     limit: int = 100,
     project_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    current_user: UserSchema = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Retrieve all documents, optionally filtered by project.
@@ -61,7 +62,7 @@ async def upload_document(
     file: UploadFile = File(...),
     project_id: Optional[int] = Form(None),
     db: Session = Depends(get_db),
-    current_user: UserSchema = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Upload a new document.
@@ -74,6 +75,15 @@ async def upload_document(
             
         if project.owner_id != current_user.id and current_user.id not in [user.id for user in project.users]:
             raise HTTPException(status_code=403, detail="Not authorized to access this project")
+    
+    # Check if the organization has reached its document limit
+    if current_user.organization_id:
+        allowed, reason = SubscriptionService.check_document_upload_allowed(db, current_user.organization_id)
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Document upload not allowed: {reason}"
+            )
     
     # Create upload directory if it doesn't exist
     os.makedirs(settings.DOCUMENT_UPLOAD_DIR, exist_ok=True)
@@ -101,12 +111,31 @@ async def upload_document(
         file_type=file_type,
         file_size=file_size,
         project_id=project_id,
-        uploaded_by=current_user.id
+        uploaded_by=current_user.id,
+        organization_id=current_user.organization_id
     )
     
     db.add(db_document)
     db.commit()
     db.refresh(db_document)
+    
+    # Record usage for billing purposes
+    if current_user.organization_id:
+        from ...schemas.subscriptions import UsageRecordCreate
+        
+        usage_record = UsageRecordCreate(
+            organization_id=current_user.organization_id,
+            user_id=current_user.id,
+            action_type="document_upload",
+            document_id=db_document.id,
+            details=f"Uploaded document: {file.filename}, Size: {file_size} bytes"
+        )
+        
+        try:
+            SubscriptionService.record_usage(db, usage_record)
+        except Exception as e:
+            # Log the error but continue, as the document has already been uploaded
+            print(f"Error recording usage: {e}")
     
     return db_document
 
@@ -114,7 +143,7 @@ async def upload_document(
 async def read_document(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: UserSchema = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Get details of a specific document, including specifications.
@@ -147,7 +176,7 @@ async def read_document(
 async def delete_document(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: UserSchema = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Delete a document.
@@ -190,7 +219,7 @@ async def trigger_document_analysis(
     analysis_request: DocumentAnalysisRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: UserSchema = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Trigger analysis for a document. The analysis will run in the background.
@@ -227,6 +256,24 @@ async def trigger_document_analysis(
             detail="Document is already being analyzed"
         )
     
+    # Record usage for billing purposes if the user has an organization
+    if current_user.organization_id:
+        from ...schemas.subscriptions import UsageRecordCreate
+        
+        usage_record = UsageRecordCreate(
+            organization_id=current_user.organization_id,
+            user_id=current_user.id,
+            action_type="document_analysis",
+            document_id=document.id,
+            details=f"Analysis triggered for document: {document.filename}"
+        )
+        
+        try:
+            SubscriptionService.record_usage(db, usage_record)
+        except Exception as e:
+            # Log the error but continue, as we still want to analyze the document
+            print(f"Error recording usage: {e}")
+    
     # Update document status
     document.analysis_status = "pending"
     db.commit()
@@ -240,7 +287,7 @@ async def trigger_document_analysis(
 async def read_document_elements(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: UserSchema = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Get elements extracted from a document.
