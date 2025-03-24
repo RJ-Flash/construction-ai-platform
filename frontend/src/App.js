@@ -1,132 +1,82 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import axios from 'axios';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
-// Import components
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import ProjectList from './pages/ProjectList';
-import ProjectDetails from './pages/ProjectDetails';
-import DocumentAnalysis from './pages/DocumentAnalysis';
-import QuoteGenerator from './pages/QuoteGenerator';
-import NotFound from './pages/NotFound';
+// Components
 import Navbar from './components/Navbar';
-import ProtectedRoute from './components/ProtectedRoute';
+import Sidebar from './components/Sidebar';
+import ToastContainer from './components/ToastContainer';
 
-// Import contexts and hooks
-import { ToastProvider } from './hooks/useToast';
-import { AuthProvider, useAuth } from './hooks/useAuth';
+// Pages
+import Dashboard from './pages/Dashboard';
+import ProjectsPage from './pages/ProjectsPage';
+import ProjectDetailsPage from './pages/ProjectDetailsPage';
+import DocumentsPage from './pages/DocumentsPage';
+import DocumentAnalysis from './pages/DocumentAnalysis';
+import ElementsPage from './pages/ElementsPage';
+import ElementDetailsPage from './pages/ElementDetailsPage';
+import QuoteGeneratorPage from './pages/QuoteGeneratorPage';
+import QuoteDetailsPage from './pages/QuoteDetailsPage';
+import SettingsPage from './pages/SettingsPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import NotFoundPage from './pages/NotFoundPage';
 
-// Import API config
-import { API_BASE_URL, createAuthHeaders } from './config/api';
+// Providers
+import { ToastProvider } from './contexts/ToastContext';
+import { AuthProvider } from './contexts/AuthContext';
 
-// Set up axios defaults
-axios.defaults.baseURL = API_BASE_URL;
-
-// Add axios interceptor for authentication
-axios.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers = {
-        ...config.headers,
-        Authorization: `Bearer ${token}`,
-      };
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Main App component
-function App() {
+const App = () => {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <Router>
-          <AppContent />
-        </Router>
-      </ToastProvider>
-    </AuthProvider>
+    <Router>
+      <AuthProvider>
+        <ToastProvider>
+          <div className="flex h-screen bg-gray-100">
+            <Sidebar />
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <Navbar />
+              <main className="flex-1 overflow-y-auto">
+                <Routes>
+                  {/* Auth Routes */}
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/register" element={<RegisterPage />} />
+                  
+                  {/* Dashboard */}
+                  <Route path="/" element={<Dashboard />} />
+                  
+                  {/* Projects Routes */}
+                  <Route path="/projects" element={<ProjectsPage />} />
+                  <Route path="/projects/:projectId" element={<ProjectDetailsPage />} />
+                  
+                  {/* Documents Routes */}
+                  <Route path="/documents" element={<DocumentsPage />} />
+                  <Route path="/documents/:id" element={<DocumentAnalysis />} />
+                  <Route path="/projects/:projectId/documents" element={<DocumentsPage />} />
+                  
+                  {/* Elements Routes */}
+                  <Route path="/elements" element={<ElementsPage />} />
+                  <Route path="/elements/:elementId" element={<ElementDetailsPage />} />
+                  <Route path="/projects/:projectId/elements" element={<ElementsPage />} />
+                  <Route path="/projects/:projectId/elements/:elementId" element={<ElementDetailsPage />} />
+                  
+                  {/* Quotes Routes */}
+                  <Route path="/projects/:projectId/quotes/new" element={<QuoteGeneratorPage />} />
+                  <Route path="/projects/:projectId/quotes/:quoteId" element={<QuoteDetailsPage />} />
+                  <Route path="/projects/:projectId/quotes/:quoteId/edit" element={<QuoteGeneratorPage />} />
+                  
+                  {/* Settings */}
+                  <Route path="/settings" element={<SettingsPage />} />
+                  
+                  {/* Not Found */}
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </main>
+            </div>
+          </div>
+          <ToastContainer />
+        </ToastProvider>
+      </AuthProvider>
+    </Router>
   );
-}
-
-// App content with access to auth context
-function AppContent() {
-  const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <div className="container mx-auto px-4 py-8">
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
-          <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/dashboard" />} />
-          
-          {/* Protected routes */}
-          <Route 
-            path="/dashboard" 
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/projects" 
-            element={
-              <ProtectedRoute>
-                <ProjectList />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/projects/:id" 
-            element={
-              <ProtectedRoute>
-                <ProjectDetails />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/documents/analyze/:id" 
-            element={
-              <ProtectedRoute>
-                <DocumentAnalysis />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/quotes/generate/:id" 
-            element={
-              <ProtectedRoute>
-                <QuoteGenerator />
-              </ProtectedRoute>
-            } 
-          />
-          
-          {/* Redirect root to dashboard or login based on auth status */}
-          <Route 
-            path="/" 
-            element={isAuthenticated ? <Navigate to="/dashboard" /> : <Navigate to="/login" />} 
-          />
-          
-          {/* Not found route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </div>
-    </div>
-  );
-}
+};
 
 export default App;
