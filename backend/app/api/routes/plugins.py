@@ -1,172 +1,146 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, Body
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from typing import List, Optional
 
-from app.api import deps
-from app.db.models.user import User
-from app.schemas.plugin import PluginCreate, PluginResponse, PluginUpdate
-from app.services.plugin import plugin_service
+from ...db.database import get_db
+from ...schemas import User as UserSchema
+from ...core.auth import get_current_active_user
+from ...plugins import get_available_plugins, get_plugin_by_id, PluginManager
+from ...plugins.base import AnalysisPlugin
 
 router = APIRouter()
 
-@router.get("/", response_model=List[PluginResponse])
-def get_plugins(
-    *,
-    db: Session = Depends(deps.get_db),
-    category: Optional[str] = Query(None, description="Filter by plugin category"),
-    status: Optional[str] = Query(None, description="Filter by plugin status"),
-    is_free: Optional[bool] = Query(None, description="Filter by free/paid plugins"),
-    skip: int = 0,
-    limit: int = 100,
-    current_user: User = Depends(deps.get_current_user)
-):
-    """
-    Get list of available plugins.
-    """
-    return plugin_service.get_plugins(
-        db=db, 
-        category=category, 
-        status=status, 
-        is_free=is_free,
-        skip=skip, 
-        limit=limit
-    )
+# Plugin manager instance
+plugin_manager = PluginManager()
 
-@router.get("/{plugin_id}", response_model=PluginResponse)
-def get_plugin(
-    *,
-    db: Session = Depends(deps.get_db),
-    plugin_id: int,
-    current_user: User = Depends(deps.get_current_user)
+# Load all available plugins
+for plugin_class in [get_plugin_by_id(plugin_info["id"]) for plugin_info in get_available_plugins()]:
+    if plugin_class:
+        plugin_manager.register_plugin(plugin_class())
+        # Enable plugin by default for development
+        plugin_manager.enable_plugin(plugin_class.id)
+
+@router.get("/", response_model=List[Dict[str, Any]])
+async def list_plugins(
+    category: Optional[str] = None,
+    enabled_only: bool = False,
+    db: Session = Depends(get_db),
+    current_user: UserSchema = Depends(get_current_active_user)
 ):
     """
-    Get plugin by ID.
+    List all available plugins, optionally filtered by category.
     """
-    plugin = plugin_service.get_plugin(db=db, plugin_id=plugin_id)
+    if enabled_only:
+        plugins = plugin_manager.list_enabled_plugins()
+    else:
+        plugins = plugin_manager.list_plugins()
+    
+    # Filter by category if specified
+    if category:
+        plugins = [plugin for plugin in plugins if plugin.get("category") == category]
+    
+    return plugins
+
+@router.get("/{plugin_id}", response_model=Dict[str, Any])
+async def get_plugin_details(
+    plugin_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserSchema = Depends(get_current_active_user)
+):
+    """
+    Get details of a specific plugin.
+    """
+    plugin = plugin_manager.get_plugin(plugin_id)
+    
     if not plugin:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Plugin not found"
-        )
-    return plugin
-
-@router.post("/", response_model=PluginResponse, status_code=status.HTTP_201_CREATED)
-def create_plugin(
-    *,
-    db: Session = Depends(deps.get_db),
-    plugin_in: PluginCreate,
-    current_user: User = Depends(deps.get_current_superuser)
-):
-    """
-    Create a new plugin (admin only).
-    """
-    return plugin_service.create_plugin(db=db, plugin_in=plugin_in)
-
-@router.post("/upload", response_model=PluginResponse, status_code=status.HTTP_201_CREATED)
-async def upload_plugin(
-    *,
-    db: Session = Depends(deps.get_db),
-    file: UploadFile = File(...),
-    current_user: User = Depends(deps.get_current_superuser)
-):
-    """
-    Upload a plugin package (admin only).
-    """
-    return await plugin_service.upload_plugin(db=db, file=file)
-
-@router.put("/{plugin_id}", response_model=PluginResponse)
-def update_plugin(
-    *,
-    db: Session = Depends(deps.get_db),
-    plugin_id: int,
-    plugin_in: PluginUpdate,
-    current_user: User = Depends(deps.get_current_superuser)
-):
-    """
-    Update plugin information (admin only).
-    """
-    plugin = plugin_service.get_plugin(db=db, plugin_id=plugin_id)
-    if not plugin:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Plugin not found"
+            detail=f"Plugin with ID '{plugin_id}' not found"
         )
     
-    if plugin.is_system:
+    return {
+        **plugin.metadata,
+        "enabled": plugin_id in plugin_manager.enabled_plugins
+    }
+
+@router.post("/{plugin_id}/enable", response_model=Dict[str, Any])
+async def enable_plugin(
+    plugin_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserSchema = Depends(get_current_active_user)
+):
+    """
+    Enable a plugin.
+    """
+    try:
+        plugin_manager.enable_plugin(plugin_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    
+    plugin = plugin_manager.get_plugin(plugin_id)
+    
+    return {
+        **plugin.metadata,
+        "enabled": True
+    }
+
+@router.post("/{plugin_id}/disable", response_model=Dict[str, Any])
+async def disable_plugin(
+    plugin_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserSchema = Depends(get_current_active_user)
+):
+    """
+    Disable a plugin.
+    """
+    try:
+        plugin_manager.disable_plugin(plugin_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    
+    plugin = plugin_manager.get_plugin(plugin_id)
+    
+    return {
+        **plugin.metadata,
+        "enabled": False
+    }
+
+@router.post("/{plugin_id}/analyze", response_model=Dict[str, Any])
+async def analyze_with_plugin(
+    plugin_id: str,
+    text: str = Body(..., embed=True),
+    context: Optional[Dict[str, Any]] = Body(None, embed=True),
+    db: Session = Depends(get_db),
+    current_user: UserSchema = Depends(get_current_active_user)
+):
+    """
+    Analyze text using a specific plugin.
+    """
+    try:
+        results = await plugin_manager.run_analysis(text, plugin_id, context)
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="System plugins cannot be modified"
+            detail=str(e)
         )
     
-    plugin = plugin_service.update_plugin(db=db, plugin=plugin, plugin_in=plugin_in)
-    return plugin
+    return results
 
-@router.delete("/{plugin_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_plugin(
-    *,
-    db: Session = Depends(deps.get_db),
-    plugin_id: int,
-    current_user: User = Depends(deps.get_current_superuser)
+@router.post("/analyze_all", response_model=Dict[str, Dict[str, Any]])
+async def analyze_with_all_plugins(
+    text: str = Body(..., embed=True),
+    context: Optional[Dict[str, Any]] = Body(None, embed=True),
+    db: Session = Depends(get_db),
+    current_user: UserSchema = Depends(get_current_active_user)
 ):
     """
-    Delete a plugin (admin only).
+    Analyze text using all enabled plugins.
     """
-    plugin = plugin_service.get_plugin(db=db, plugin_id=plugin_id)
-    if not plugin:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Plugin not found"
-        )
-    
-    if plugin.is_system:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="System plugins cannot be deleted"
-        )
-    
-    plugin_service.delete_plugin(db=db, plugin_id=plugin_id)
-    return None
-
-@router.post("/{plugin_id}/install", response_model=PluginResponse)
-def install_plugin(
-    *,
-    db: Session = Depends(deps.get_db),
-    plugin_id: int,
-    current_user: User = Depends(deps.get_current_user)
-):
-    """
-    Install a plugin for use.
-    """
-    plugin = plugin_service.get_plugin(db=db, plugin_id=plugin_id)
-    if not plugin:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Plugin not found"
-        )
-    
-    if plugin.status != "active":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only active plugins can be installed"
-        )
-    
-    return plugin_service.install_plugin(db=db, plugin=plugin, user_id=current_user.id)
-
-@router.post("/{plugin_id}/uninstall", response_model=PluginResponse)
-def uninstall_plugin(
-    *,
-    db: Session = Depends(deps.get_db),
-    plugin_id: int,
-    current_user: User = Depends(deps.get_current_user)
-):
-    """
-    Uninstall a plugin.
-    """
-    plugin = plugin_service.get_plugin(db=db, plugin_id=plugin_id)
-    if not plugin:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Plugin not found"
-        )
-    
-    return plugin_service.uninstall_plugin(db=db, plugin=plugin, user_id=current_user.id)
+    results = await plugin_manager.run_all_enabled_plugins(text, context)
+    return results
