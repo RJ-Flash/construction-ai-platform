@@ -1,179 +1,192 @@
-"""
-SQLAlchemy database models.
-"""
-import uuid
-from datetime import datetime
-from typing import Dict, List, Optional
-
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text, Float, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, Text, DateTime, Enum, Table
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+import enum
+from datetime import datetime
+from .database import Base
 
-from .base_class import Base
+# Association tables
+project_users = Table(
+    "project_users",
+    Base.metadata,
+    Column("project_id", Integer, ForeignKey("projects.id"), primary_key=True),
+    Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
+)
 
+# Enums
+class QuoteStatus(str, enum.Enum):
+    DRAFT = "draft"
+    SENT = "sent"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
 
+# User model
 class User(Base):
-    """User model."""
     __tablename__ = "users"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email = Column(String, unique=True, index=True, nullable=False)
-    full_name = Column(String, index=True)
-    company_name = Column(String, index=True)
-    hashed_password = Column(String, nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True)
+    full_name = Column(String, nullable=True)
+    hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
-    is_superuser = Column(Boolean, default=False)
-    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     # Relationships
-    projects = relationship("Project", back_populates="owner")
-    documents = relationship("Document", back_populates="owner")
-    quotes = relationship("Quote", back_populates="owner")
+    projects = relationship("Project", secondary=project_users, back_populates="users")
+    owned_projects = relationship("Project", back_populates="owner", foreign_keys="Project.owner_id")
 
-
+# Project model
 class Project(Base):
-    """Construction project model."""
     __tablename__ = "projects"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String, index=True, nullable=False)
-    description = Column(Text)
-    location = Column(String, index=True)
-    client_name = Column(String, index=True)
-    start_date = Column(DateTime)
-    end_date = Column(DateTime)
-    status = Column(String, index=True, default="planning")
-    
-    # Metadata fields
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    description = Column(Text, nullable=True)
+    location = Column(String, nullable=True)
+    status = Column(String, default="active")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Foreign keys
-    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    
+    owner_id = Column(Integer, ForeignKey("users.id"))
+
     # Relationships
-    owner = relationship("User", back_populates="projects")
+    owner = relationship("User", back_populates="owned_projects", foreign_keys=[owner_id])
+    users = relationship("User", secondary=project_users, back_populates="projects")
     documents = relationship("Document", back_populates="project")
-    quotes = relationship("Quote", back_populates="project")
     elements = relationship("Element", back_populates="project")
+    quotes = relationship("Quote", back_populates="project")
 
+# Client model
+class Client(Base):
+    __tablename__ = "clients"
 
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    email = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+
+    # Relationships
+    project = relationship("Project")
+    quotes = relationship("Quote", back_populates="client")
+
+# Document model
 class Document(Base):
-    """Construction document model (blueprints, plans, etc.)."""
     __tablename__ = "documents"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    filename = Column(String, nullable=False)
-    file_path = Column(String, nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String, index=True)
+    file_path = Column(String)
     file_type = Column(String)
-    description = Column(Text)
-    upload_date = Column(DateTime, default=datetime.utcnow)
-    
-    # Document analysis status
+    file_size = Column(Integer)
     is_analyzed = Column(Boolean, default=False)
-    analysis_date = Column(DateTime)
-    analysis_status = Column(String, default="pending")
-    analysis_message = Column(Text)
-    
-    # Foreign keys
-    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"))
-    
+    analysis_status = Column(String, default="not_analyzed")
+    analysis_date = Column(DateTime, nullable=True)
+    upload_date = Column(DateTime, default=datetime.utcnow)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+    uploaded_by = Column(Integer, ForeignKey("users.id"))
+
     # Relationships
-    owner = relationship("User", back_populates="documents")
     project = relationship("Project", back_populates="documents")
-    elements = relationship("Element", back_populates="source_document")
+    elements = relationship("Element", back_populates="document")
+    specifications = relationship("DocumentSpecification", back_populates="document")
 
+# DocumentSpecification model
+class DocumentSpecification(Base):
+    __tablename__ = "document_specifications"
 
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String, index=True)
+    key = Column(String, index=True)
+    value = Column(Text)
+    document_id = Column(Integer, ForeignKey("documents.id"))
+
+    # Relationships
+    document = relationship("Document", back_populates="specifications")
+
+# Element model
 class Element(Base):
-    """Construction element extracted from documents."""
     __tablename__ = "elements"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    type = Column(String, index=True, nullable=False)
-    dimensions = Column(String)
-    materials = Column(String)
-    quantity = Column(String)
-    notes = Column(Text)
-    
-    # Additional specifications as JSON
-    specifications = Column(JSON)
-    
-    # Metadata
+    id = Column(Integer, primary_key=True, index=True)
+    type = Column(String, index=True)
+    materials = Column(String, nullable=True)
+    dimensions = Column(String, nullable=True)
+    quantity = Column(Float, default=1.0)
+    estimated_price = Column(Float, nullable=True)
+    notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Foreign keys
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"))
-    source_document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"))
-    
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+
     # Relationships
+    document = relationship("Document", back_populates="elements")
     project = relationship("Project", back_populates="elements")
-    source_document = relationship("Document", back_populates="elements")
     quote_items = relationship("QuoteItem", back_populates="element")
 
-
+# Quote model
 class Quote(Base):
-    """Construction quote/estimate model."""
     __tablename__ = "quotes"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String, index=True)
-    description = Column(Text)
-    region = Column(String, index=True)
-    version = Column(String, default="1.0")
-    status = Column(String, default="draft")
-    
-    # Financial summary
-    total_min = Column(Float)
-    total_max = Column(Float)
-    currency = Column(String, default="USD")
-    
-    # Additional data
-    notes = Column(Text)
-    preferences = Column(JSON)
-    
-    # Metadata
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True)
+    status = Column(Enum(QuoteStatus), default=QuoteStatus.DRAFT)
+    client_name = Column(String, nullable=True)
+    client_email = Column(String, nullable=True)
+    client_phone = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    tax_rate = Column(Float, default=0.0)
+    discount_percentage = Column(Float, default=0.0)
+    subtotal_amount = Column(Float, default=0.0)
+    tax_amount = Column(Float, default=0.0)
+    discount_amount = Column(Float, default=0.0)
+    total_amount = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Foreign keys
-    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"))
-    
+    expiry_date = Column(DateTime, nullable=True)
+    project_id = Column(Integer, ForeignKey("projects.id"))
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"))
+
     # Relationships
-    owner = relationship("User", back_populates="quotes")
     project = relationship("Project", back_populates="quotes")
-    items = relationship("QuoteItem", back_populates="quote")
+    client = relationship("Client", back_populates="quotes")
+    items = relationship("QuoteItem", back_populates="quote", cascade="all, delete-orphan")
+    activities = relationship("QuoteActivity", back_populates="quote", cascade="all, delete-orphan")
 
-
+# QuoteItem model
 class QuoteItem(Base):
-    """Individual line item in a quote."""
     __tablename__ = "quote_items"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    description = Column(String, nullable=False)
-    category = Column(String, index=True)
-    
-    # Cost breakdown
-    material_cost_min = Column(Float)
-    material_cost_max = Column(Float)
-    labor_cost_min = Column(Float)
-    labor_cost_max = Column(Float)
-    equipment_cost_min = Column(Float)
-    equipment_cost_max = Column(Float)
-    
-    # Time estimates
-    time_estimate_min = Column(Float)  # Hours
-    time_estimate_max = Column(Float)  # Hours
-    
-    # Additional data
-    notes = Column(Text)
-    specifications = Column(JSON)
-    
-    # Foreign keys
-    quote_id = Column(UUID(as_uuid=True), ForeignKey("quotes.id"))
-    element_id = Column(UUID(as_uuid=True), ForeignKey("elements.id"))
-    
+    id = Column(Integer, primary_key=True, index=True)
+    description = Column(String)
+    details = Column(Text, nullable=True)
+    quantity = Column(Float, default=1.0)
+    unit_price = Column(Float, default=0.0)
+    total_price = Column(Float, default=0.0)
+    quote_id = Column(Integer, ForeignKey("quotes.id"))
+    element_id = Column(Integer, ForeignKey("elements.id"), nullable=True)
+
     # Relationships
     quote = relationship("Quote", back_populates="items")
     element = relationship("Element", back_populates="quote_items")
+
+# QuoteActivity model
+class QuoteActivity(Base):
+    __tablename__ = "quote_activities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    action = Column(String)
+    notes = Column(Text, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    quote_id = Column(Integer, ForeignKey("quotes.id"))
+
+    # Relationships
+    quote = relationship("Quote", back_populates="activities")
+    user = relationship("User")
