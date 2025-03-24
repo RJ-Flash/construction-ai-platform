@@ -22,13 +22,13 @@ import { authAPI } from '@/services/api'
 
 // Form validation schema
 const registerSchema = z.object({
-  full_name: z.string().min(3, { message: "Full name must be at least 3 characters" }),
+  full_name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   email: z.string().email({ message: "Please enter a valid email address" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
+  password: z.string().min(8, { message: "Password must be at least 8 characters" }),
+  confirm_password: z.string()
+}).refine((data) => data.password === data.confirm_password, {
   message: "Passwords do not match",
-  path: ["confirmPassword"],
+  path: ["confirm_password"],
 })
 
 type RegisterFormValues = z.infer<typeof registerSchema>
@@ -45,7 +45,7 @@ const Register = () => {
       full_name: '',
       email: '',
       password: '',
-      confirmPassword: '',
+      confirm_password: '',
     },
   })
   
@@ -53,11 +53,9 @@ const Register = () => {
     try {
       setLoading(true)
       
-      // Extract required fields (exclude confirmPassword)
-      const { full_name, email, password } = data
-      
       // Call register API
-      const response = await authAPI.register({ email, password, full_name })
+      const { confirm_password, ...registerData } = data
+      const response = await authAPI.register(registerData)
       
       // Extract token from response
       const { access_token } = response
@@ -82,7 +80,7 @@ const Register = () => {
       navigate('/')
     } catch (error) {
       console.error('Registration error:', error)
-      toast.error('Registration failed. Please try again.')
+      toast.error('Registration failed. This email may already be in use.')
     } finally {
       setLoading(false)
     }
@@ -103,7 +101,6 @@ const Register = () => {
             <Label htmlFor="full_name">Full Name</Label>
             <Input
               id="full_name"
-              type="text"
               placeholder="John Doe"
               {...register('full_name')}
             />
@@ -130,6 +127,7 @@ const Register = () => {
             <Input
               id="password"
               type="password"
+              placeholder="••••••••"
               {...register('password')}
             />
             {errors.password && (
@@ -138,28 +136,29 @@ const Register = () => {
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Label htmlFor="confirm_password">Confirm Password</Label>
             <Input
-              id="confirmPassword"
+              id="confirm_password"
               type="password"
-              {...register('confirmPassword')}
+              placeholder="••••••••"
+              {...register('confirm_password')}
             />
-            {errors.confirmPassword && (
-              <p className="text-sm text-red-500">{errors.confirmPassword.message}</p>
+            {errors.confirm_password && (
+              <p className="text-sm text-red-500">{errors.confirm_password.message}</p>
             )}
           </div>
           
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Creating account...' : 'Create Account'}
+            {loading ? 'Creating account...' : 'Register'}
           </Button>
         </form>
       </CardContent>
       
       <CardFooter className="flex justify-center">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-center text-muted-foreground">
           Already have an account?{' '}
           <Link to="/login" className="text-primary hover:underline">
-            Sign in
+            Login
           </Link>
         </p>
       </CardFooter>
