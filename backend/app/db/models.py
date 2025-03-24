@@ -1,206 +1,164 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, Text, DateTime, Enum, Table
+"""
+Database Models
+
+This module contains SQLAlchemy models for the database.
+"""
+import datetime
+import uuid
+from typing import Optional, List, Dict, Any
+import json
+
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Float, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-import enum
-from datetime import datetime
-from .database import Base
-from .models.subscription_models import PlanType, Organization, Subscription, PluginLicense, UsageRecord
+from sqlalchemy.ext.hybrid import hybrid_property
 
-# Association tables
-project_users = Table(
-    "project_users",
-    Base.metadata,
-    Column("project_id", Integer, ForeignKey("projects.id"), primary_key=True),
-    Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
-)
+from app.db.config import Base
 
-# Enums
-class QuoteStatus(str, enum.Enum):
-    DRAFT = "draft"
-    SENT = "sent"
-    ACCEPTED = "accepted"
-    DECLINED = "declined"
 
-# User model
 class User(Base):
+    """User model."""
     __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    email = Column(String, unique=True, index=True)
-    full_name = Column(String, nullable=True)
-    hashed_password = Column(String)
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    first_name = Column(String(100))
+    last_name = Column(String(100))
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
+    date_joined = Column(DateTime, default=datetime.datetime.utcnow)
+    
     # Relationships
-    organization = relationship("Organization", back_populates="users")
-    projects = relationship("Project", secondary=project_users, back_populates="users")
-    owned_projects = relationship("Project", back_populates="owner", foreign_keys="Project.owner_id")
-    usage_records = relationship("UsageRecord", back_populates="user")
+    subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan")
+    purchased_plugins = relationship("UserPlugin", back_populates="user", cascade="all, delete-orphan")
+    analysis_results = relationship("AnalysisResult", back_populates="user", cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<User {self.email}>"
 
-# Project model
-class Project(Base):
-    __tablename__ = "projects"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    description = Column(Text, nullable=True)
-    location = Column(String, nullable=True)
-    status = Column(String, default="active")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    owner_id = Column(Integer, ForeignKey("users.id"))
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
-
+class Subscription(Base):
+    """Subscription model."""
+    __tablename__ = "subscriptions"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    tier = Column(String(50), nullable=False)  # "free", "professional", "enterprise"
+    price = Column(Float, nullable=False)
+    start_date = Column(DateTime, default=datetime.datetime.utcnow)
+    end_date = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True)
+    payment_id = Column(String(255), nullable=True)
+    
     # Relationships
-    owner = relationship("User", back_populates="owned_projects", foreign_keys=[owner_id])
-    users = relationship("User", secondary=project_users, back_populates="projects")
-    organization = relationship("Organization")
-    documents = relationship("Document", back_populates="project")
-    elements = relationship("Element", back_populates="project")
-    quotes = relationship("Quote", back_populates="project")
+    user = relationship("User", back_populates="subscriptions")
+    
+    def __repr__(self):
+        return f"<Subscription {self.tier} for {self.user_id}>"
 
-# Client model
-class Client(Base):
-    __tablename__ = "clients"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    email = Column(String, nullable=True)
-    phone = Column(String, nullable=True)
-    address = Column(String, nullable=True)
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
-
-    # Relationships
-    project = relationship("Project")
-    organization = relationship("Organization")
-    quotes = relationship("Quote", back_populates="client")
-
-# Document model
-class Document(Base):
-    __tablename__ = "documents"
-
-    id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String, index=True)
-    file_path = Column(String)
-    file_type = Column(String)
-    file_size = Column(Integer)
-    is_analyzed = Column(Boolean, default=False)
-    analysis_status = Column(String, default="not_analyzed")
-    analysis_date = Column(DateTime, nullable=True)
-    upload_date = Column(DateTime, default=datetime.utcnow)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
-    uploaded_by = Column(Integer, ForeignKey("users.id"))
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
-
-    # Relationships
-    project = relationship("Project", back_populates="documents")
-    organization = relationship("Organization")
-    elements = relationship("Element", back_populates="document")
-    specifications = relationship("DocumentSpecification", back_populates="document")
-    usage_records = relationship("UsageRecord", back_populates="document")
-
-# DocumentSpecification model
-class DocumentSpecification(Base):
-    __tablename__ = "document_specifications"
-
-    id = Column(Integer, primary_key=True, index=True)
-    category = Column(String, index=True)
-    key = Column(String, index=True)
-    value = Column(Text)
-    document_id = Column(Integer, ForeignKey("documents.id"))
-
-    # Relationships
-    document = relationship("Document", back_populates="specifications")
-
-# Element model
-class Element(Base):
-    __tablename__ = "elements"
-
-    id = Column(Integer, primary_key=True, index=True)
-    type = Column(String, index=True)
-    materials = Column(String, nullable=True)
-    dimensions = Column(String, nullable=True)
-    quantity = Column(Float, default=1.0)
-    estimated_price = Column(Float, nullable=True)
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    document_id = Column(Integer, ForeignKey("documents.id"), nullable=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
-
-    # Relationships
-    document = relationship("Document", back_populates="elements")
-    project = relationship("Project", back_populates="elements")
-    quote_items = relationship("QuoteItem", back_populates="element")
-
-# Quote model
-class Quote(Base):
-    __tablename__ = "quotes"
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, index=True)
-    status = Column(Enum(QuoteStatus), default=QuoteStatus.DRAFT)
-    client_name = Column(String, nullable=True)
-    client_email = Column(String, nullable=True)
-    client_phone = Column(String, nullable=True)
-    notes = Column(Text, nullable=True)
-    tax_rate = Column(Float, default=0.0)
-    discount_percentage = Column(Float, default=0.0)
-    subtotal_amount = Column(Float, default=0.0)
-    tax_amount = Column(Float, default=0.0)
-    discount_amount = Column(Float, default=0.0)
-    total_amount = Column(Float, default=0.0)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+class UserPlugin(Base):
+    """User-Plugin relationship model."""
+    __tablename__ = "user_plugins"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    plugin_id = Column(String(255), nullable=False)
+    purchase_date = Column(DateTime, default=datetime.datetime.utcnow)
     expiry_date = Column(DateTime, nullable=True)
-    project_id = Column(Integer, ForeignKey("projects.id"))
-    client_id = Column(Integer, ForeignKey("clients.id"), nullable=True)
-    created_by = Column(Integer, ForeignKey("users.id"))
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
-
+    is_active = Column(Boolean, default=True)
+    payment_id = Column(String(255), nullable=True)
+    
+    # Unique constraint to prevent duplicate purchases
+    __table_args__ = (UniqueConstraint("user_id", "plugin_id", name="_user_plugin_uc"),)
+    
     # Relationships
-    project = relationship("Project", back_populates="quotes")
-    client = relationship("Client", back_populates="quotes")
-    organization = relationship("Organization")
-    items = relationship("QuoteItem", back_populates="quote", cascade="all, delete-orphan")
-    activities = relationship("QuoteActivity", back_populates="quote", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="purchased_plugins")
+    
+    def __repr__(self):
+        return f"<UserPlugin {self.plugin_id} for {self.user_id}>"
 
-# QuoteItem model
-class QuoteItem(Base):
-    __tablename__ = "quote_items"
 
-    id = Column(Integer, primary_key=True, index=True)
-    description = Column(String)
-    details = Column(Text, nullable=True)
-    quantity = Column(Float, default=1.0)
-    unit_price = Column(Float, default=0.0)
-    total_price = Column(Float, default=0.0)
-    quote_id = Column(Integer, ForeignKey("quotes.id"))
-    element_id = Column(Integer, ForeignKey("elements.id"), nullable=True)
-
+class AnalysisResult(Base):
+    """Analysis result model."""
+    __tablename__ = "analysis_results"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    plugin_id = Column(String(255), nullable=False)
+    project_id = Column(String(36), nullable=True)
+    name = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    input_text = Column(Text, nullable=False)
+    _results_json = Column("results_json", Text, nullable=False)
+    
     # Relationships
-    quote = relationship("Quote", back_populates="items")
-    element = relationship("Element", back_populates="quote_items")
+    user = relationship("User", back_populates="analysis_results")
+    
+    @hybrid_property
+    def results(self) -> Dict[str, Any]:
+        """Get the results as a Python dictionary."""
+        return json.loads(self._results_json)
+    
+    @results.setter
+    def results(self, value: Dict[str, Any]):
+        """Set the results from a Python dictionary."""
+        self._results_json = json.dumps(value)
+    
+    def __repr__(self):
+        return f"<AnalysisResult {self.name} by {self.plugin_id}>"
 
-# QuoteActivity model
-class QuoteActivity(Base):
-    __tablename__ = "quote_activities"
 
-    id = Column(Integer, primary_key=True, index=True)
-    action = Column(String)
-    notes = Column(Text, nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    quote_id = Column(Integer, ForeignKey("quotes.id"))
+class Project(Base):
+    """Project model."""
+    __tablename__ = "projects"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    is_archived = Column(Boolean, default=False)
+    
+    def __repr__(self):
+        return f"<Project {self.name}>"
 
-    # Relationships
-    quote = relationship("Quote", back_populates="activities")
-    user = relationship("User")
+
+class Document(Base):
+    """Document model for storing construction documents."""
+    __tablename__ = "documents"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    file_path = Column(String(512), nullable=False)
+    file_type = Column(String(50), nullable=False)  # "specification", "drawing", "contract", etc.
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    is_archived = Column(Boolean, default=False)
+    
+    def __repr__(self):
+        return f"<Document {self.name}>"
+
+
+class BIMIntegration(Base):
+    """BIM Integration model for storing BIM integration details."""
+    __tablename__ = "bim_integrations"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=True)
+    name = Column(String(255), nullable=False)
+    platform = Column(String(50), nullable=False)  # "revit", "archicad", "bentley", etc.
+    api_key = Column(String(512), nullable=True)
+    connection_details = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+    
+    def __repr__(self):
+        return f"<BIMIntegration {self.name} for {self.platform}>"
