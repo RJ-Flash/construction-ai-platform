@@ -1,79 +1,86 @@
 from datetime import timedelta
-from typing import Any
-
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from app.api import deps
-from app.core.config import settings
-from app.core.security import create_access_token, verify_password
-from app.schemas.token import Token
-from app.schemas.user import UserCreate
-from app.services.user import user_service
+from ...core.auth import (
+    authenticate_user, 
+    create_access_token, 
+    get_current_active_user,
+    get_password_hash,
+    ACCESS_TOKEN_EXPIRE_MINUTES
+)
+from ...db.database import get_db
+from ...db.models import User
+from ...schemas.users import User as UserSchema, UserCreate, Token
 
 router = APIRouter()
 
 @router.post("/login", response_model=Token)
-def login_access_token(
-    db: Session = Depends(deps.get_db),
-    form_data: OAuth2PasswordRequestForm = Depends()
-) -> Any:
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
     """
     OAuth2 compatible token login, get an access token for future requests.
     """
-    user = user_service.get_user_by_email(db, email=form_data.username)
+    user = authenticate_user(db, form_data.username, form_data.password)
+    
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    if not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-        )
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user",
-        )
+        
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, 
+        expires_delta=access_token_expires
+    )
     
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    return {
-        "access_token": create_access_token(
-            user.id, expires_delta=access_token_expires
-        ),
-        "token_type": "bearer",
-    }
+    return {"access_token": access_token, "token_type": "bearer"}
 
-@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
-def register_user(
-    *,
-    db: Session = Depends(deps.get_db),
+@router.post("/register", response_model=UserSchema)
+async def register_user(
     user_in: UserCreate,
-) -> Any:
+    db: Session = Depends(get_db)
+):
     """
-    Register a new user and return an access token.
+    Register a new user.
     """
-    user = user_service.get_user_by_email(db, email=user_in.email)
-    if user:
+    # Check if username exists
+    db_user = db.query(User).filter(User.username == user_in.username).first()
+    if db_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The user with this email already exists in the system",
+            detail="Username already registered",
+        )
+        
+    # Check if email exists
+    db_user = db.query(User).filter(User.email == user_in.email).first()
+    if db_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered",
         )
     
-    # For security, set role to 'estimator' by default, regardless of what was sent
-    if hasattr(user_in, 'role') and user_in.role == 'admin':
-        # Only allow registration of regular users through this endpoint
-        user_in.role = 'estimator'
+    # Create new user
+    user_data = user_in.dict()
+    hashed_password = get_password_hash(user_data.pop("password"))
     
-    user = user_service.create_user(db, user_in=user_in)
+    db_user = User(**user_data, hashed_password=hashed_password)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
     
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    return {
-        "access_token": create_access_token(
-            user.id, expires_delta=access_token_expires
-        ),
-        "token_type": "bearer",
-    }
+    return UserSchema.from_orm(db_user)
+
+@router.get("/profile", response_model=UserSchema)
+async def read_users_me(
+    current_user: UserSchema = Depends(get_current_active_user)
+):
+    """
+    Get current user profile.
+    """
+    return current_user
