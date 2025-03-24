@@ -1,81 +1,74 @@
-// API configuration
+// API Configuration
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
-// Development API URL
-const DEV_API_URL = 'http://localhost:8000';
-
-// Production API URL
-const PROD_API_URL = 'https://api.construction-ai-platform.com';
-
-// Use production URL in production environment, development URL otherwise
-export const API_BASE_URL = 
-  process.env.NODE_ENV === 'production' ? PROD_API_URL : DEV_API_URL;
-
-// Default request timeout in milliseconds
-export const DEFAULT_TIMEOUT = 30000;
-
-// API endpoints
 export const ENDPOINTS = {
   // Auth endpoints
   AUTH: {
-    LOGIN: '/api/v1/auth/login',
-    REGISTER: '/api/v1/users',
-    PROFILE: '/api/v1/users/me',
+    LOGIN: `${API_URL}/auth/login`,
+    REGISTER: `${API_URL}/auth/register`,
+    LOGOUT: `${API_URL}/auth/logout`,
+    REFRESH: `${API_URL}/auth/refresh`,
+    PROFILE: `${API_URL}/auth/profile`
   },
   
-  // Project endpoints
+  // Projects endpoints
   PROJECTS: {
-    LIST: '/api/v1/projects',
-    DETAILS: (id) => `/api/v1/projects/${id}`,
-    CREATE: '/api/v1/projects',
-    UPDATE: (id) => `/api/v1/projects/${id}`,
-    DELETE: (id) => `/api/v1/projects/${id}`,
-    DOCUMENTS: (id) => `/api/v1/projects/${id}/documents`,
-    ELEMENTS: (id) => `/api/v1/projects/${id}/elements`,
-    QUOTES: (id) => `/api/v1/projects/${id}/quotes`,
+    LIST: `${API_URL}/projects`,
+    CREATE: `${API_URL}/projects`,
+    DETAILS: (id) => `${API_URL}/projects/${id}`,
+    UPDATE: (id) => `${API_URL}/projects/${id}`,
+    DELETE: (id) => `${API_URL}/projects/${id}`,
+    DOCUMENTS: (id) => `${API_URL}/projects/${id}/documents`,
+    ELEMENTS: (id) => `${API_URL}/projects/${id}/elements`,
+    QUOTES: (id) => `${API_URL}/projects/${id}/quotes`,
+    STATS: (id) => `${API_URL}/projects/${id}/stats`
   },
   
-  // Document endpoints
+  // Documents endpoints
   DOCUMENTS: {
-    UPLOAD: '/api/v1/documents/upload',
-    ANALYZE: '/api/v1/documents/analyze',
+    LIST: `${API_URL}/documents`,
+    UPLOAD: `${API_URL}/documents/upload`,
+    DETAILS: (id) => `${API_URL}/documents/${id}`,
+    DELETE: (id) => `${API_URL}/documents/${id}`,
+    ANALYZE: `${API_URL}/documents/analyze`,
+    ELEMENTS: (id) => `${API_URL}/documents/${id}/elements`
   },
   
-  // Quote endpoints
+  // Elements endpoints
+  ELEMENTS: {
+    LIST: `${API_URL}/elements`,
+    CREATE: `${API_URL}/elements`,
+    DETAILS: (id) => `${API_URL}/elements/${id}`,
+    UPDATE: (id) => `${API_URL}/elements/${id}`,
+    DELETE: (id) => `${API_URL}/elements/${id}`,
+    RELATED: (id) => `${API_URL}/elements/${id}/related`
+  },
+  
+  // Quotes endpoints
   QUOTES: {
-    LIST: '/api/v1/quotes',
-    DETAILS: (id) => `/api/v1/quotes/${id}`,
-    CREATE: '/api/v1/quotes',
-    UPDATE: (id) => `/api/v1/quotes/${id}`,
-    DELETE: (id) => `/api/v1/quotes/${id}`,
-    ITEMS: (id) => `/api/v1/quotes/${id}/items`,
-    GENERATE: (id) => `/api/v1/quotes/${id}/generate-from-elements`,
+    LIST: `${API_URL}/quotes`,
+    CREATE: `${API_URL}/quotes`,
+    DETAILS: (id) => `${API_URL}/quotes/${id}`,
+    UPDATE: (id) => `${API_URL}/quotes/${id}`,
+    DELETE: (id) => `${API_URL}/quotes/${id}`,
+    UPDATE_STATUS: (id) => `${API_URL}/quotes/${id}/status`,
+    PDF: (id) => `${API_URL}/quotes/${id}/pdf`
   },
-};
-
-// Create API request headers with authentication token
-export const createAuthHeaders = (token) => {
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-  };
-};
-
-// Handle API errors
-export const handleApiError = (error) => {
-  let errorMessage = 'An unexpected error occurred';
   
-  if (error.response) {
-    // The request was made and the server responded with a status code
-    // that falls out of the range of 2xx
-    if (error.response.data && error.response.data.detail) {
-      errorMessage = error.response.data.detail;
-    } else {
-      errorMessage = `Error ${error.response.status}: ${error.response.statusText}`;
-    }
-  } else if (error.request) {
-    // The request was made but no response was received
-    errorMessage = 'No response received from server';
+  // Users endpoints
+  USERS: {
+    LIST: `${API_URL}/users`,
+    DETAILS: (id) => `${API_URL}/users/${id}`,
+    UPDATE: (id) => `${API_URL}/users/${id}`,
+    DELETE: (id) => `${API_URL}/users/${id}`
+  },
+  
+  // Settings endpoints
+  SETTINGS: {
+    GENERAL: `${API_URL}/settings/general`,
+    ORGANIZATION: `${API_URL}/settings/organization`,
+    PRICING: `${API_URL}/settings/pricing`
   }
-  
-  return errorMessage;
 };
+
+export default ENDPOINTS;
