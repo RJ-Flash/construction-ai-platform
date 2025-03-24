@@ -10,6 +10,7 @@ A comprehensive platform for construction document analysis, element extraction,
 - **Project Management**: Organize documents, elements, and quotes by project
 - **Client Management**: Track client information and manage client-specific quotes
 - **Specialized Plugins**: Extend functionality with trade-specific analysis tools
+- **Subscription Management**: Flexible subscription plans with usage tracking and plugin licensing
 
 ## Specialized Plugin Modules
 
@@ -51,7 +52,7 @@ The platform offers a comprehensive suite of specialized plugins to enhance anal
 | **Starter** | 5 PDFs per month | $49/month |
 | **Essential** | 10 documents (PDF, CAD, BIM) | $129/month |
 | **Professional** | 20 documents per month | $249/month |
-| **Advanced** | 5 User Seats, 10 documents per month | $599/month |
+| **Advanced** | 10 User Seats, 40 documents per month | $599/month |
 | **Ultimate** | Unlimited seats, custom document allowance | Contact Sales |
 
 ### Add-Ons
@@ -59,6 +60,16 @@ The platform offers a comprehensive suite of specialized plugins to enhance anal
 - **Specialized Plugins**: $99-$299 each
 - **Premium Setup & Training**: $499 one-time fee
 - **Annual Subscription**: 10-15% discount
+
+### Subscription Features
+
+- **Organization Management**: Create and manage organizations with multiple users
+- **Usage Tracking**: Monitor document uploads and analysis operations
+- **Plugin Licensing**: Purchase and manage plugin licenses
+- **Billing Management**: Flexible billing cycles (monthly/annual)
+- **Usage Reports**: Track usage and optimize subscription plans
+
+For detailed information about the subscription management system, see [Subscription Management Documentation](docs/subscription_management.md).
 
 ## Technology Stack
 
@@ -73,6 +84,7 @@ The platform offers a comprehensive suite of specialized plugins to enhance anal
 - PostgreSQL database
 - JWT authentication
 - AI document processing pipeline
+- Subscription management system
 
 ## Installation
 
@@ -149,6 +161,8 @@ uvicorn app.main:app --reload
     │   ├── plugins/         # Specialized estimating plugins
     │   └── main.py          # Application entry point
     ├── alembic/             # Database migrations
+    ├── docs/                # Project documentation 
+    ├── tests/               # Unit and integration tests
     └── requirements.txt     # Python dependencies
 ```
 
@@ -175,6 +189,12 @@ uvicorn app.main:app --reload
 - Apply trade-specific analysis to projects
 - Enhanced accuracy for specialized construction fields
 
+### Subscription Management
+- Organization dashboard for subscription status
+- Usage monitoring and reporting
+- Plugin license management
+- User seat management
+
 ## License
 
 [MIT License](LICENSE)
@@ -182,3 +202,5 @@ uvicorn app.main:app --reload
 ## About
 
 The Construction AI Platform is designed to help construction professionals automate the tedious process of analyzing construction documents, extracting relevant elements, and creating accurate quotes. By leveraging AI technology, the platform reduces the time spent on manual calculations and data entry, allowing construction firms to focus on delivering high-quality work to their clients.
+
+The subscription management system provides flexible pricing options to suit construction firms of all sizes, from small contractors to large enterprises. Organizations can select the plan that best fits their needs and scale up as their requirements grow.
