@@ -1,86 +1,80 @@
-from typing import Dict, List, Optional, Any, Type
-import os
-import importlib
-import json
-import logging
-import pkgutil
-from .base import AnalysisPlugin
+"""
+Plugin Registry System
 
-logger = logging.getLogger(__name__)
+This module provides a central registry for plugins in the system.
+"""
+from typing import Dict, Type, Optional, List
+
 
 # Global plugin registry
-_PLUGINS: Dict[str, Type[AnalysisPlugin]] = {}
+_plugin_registry: Dict[str, Type] = {}
 
-def register_plugin(plugin_class: Type[AnalysisPlugin]) -> Type[AnalysisPlugin]:
+
+def register_plugin(plugin_class):
     """
-    Register a plugin class with the registry.
-    Can be used as a decorator.
+    Decorator to register a plugin class with the registry.
     
     Args:
-        plugin_class: Plugin class to register
+        plugin_class: The plugin class to register.
         
     Returns:
-        The plugin class (for decorator usage)
+        The plugin class, unchanged.
     """
-    if not plugin_class.id:
-        raise ValueError(f"Plugin class {plugin_class.__name__} has no ID")
+    # Create an instance of the plugin class to get its ID
+    plugin_instance = plugin_class()
+    plugin_id = plugin_instance.id
     
-    if plugin_class.id in _PLUGINS:
-        logger.warning(f"Plugin with ID '{plugin_class.id}' already registered, overwriting")
-    
-    _PLUGINS[plugin_class.id] = plugin_class
-    logger.info(f"Registered plugin class: {plugin_class.__name__} (ID: {plugin_class.id})")
+    # Register the plugin class
+    _plugin_registry[plugin_id] = plugin_class
     
     return plugin_class
 
-def get_plugin_by_id(plugin_id: str) -> Optional[Type[AnalysisPlugin]]:
+
+def get_plugin_by_id(plugin_id: str) -> Optional[Type]:
     """
-    Get a plugin class by ID.
+    Gets a plugin class by its ID.
     
     Args:
-        plugin_id: ID of the plugin
+        plugin_id: The ID of the plugin to get.
         
     Returns:
-        Plugin class or None if not found
+        The plugin class or None if not found.
     """
-    return _PLUGINS.get(plugin_id)
+    return _plugin_registry.get(plugin_id)
 
-def get_available_plugins() -> List[Dict[str, Any]]:
+
+def get_all_plugins() -> Dict[str, Type]:
     """
-    Get a list of all available plugins with their metadata.
+    Gets all registered plugins.
     
     Returns:
-        List of plugin metadata
+        A dictionary mapping plugin IDs to plugin classes.
     """
-    result = []
-    
-    for plugin_id, plugin_class in _PLUGINS.items():
-        # Create a temporary instance to get metadata
-        plugin = plugin_class()
-        result.append(plugin.metadata)
-    
-    return result
+    return _plugin_registry.copy()
 
-def discover_plugins() -> None:
+
+def get_plugins_by_category(category: str) -> Dict[str, Type]:
     """
-    Discover and load plugins from the plugins directory.
-    """
-    # Get the current directory (where this file is)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
+    Gets all plugins in a specific category.
     
-    # Walk through all packages in the plugins directory
-    for _, name, ispkg in pkgutil.iter_modules([current_dir]):
-        # Skip base modules and non-packages
-        if name in ['base', 'registry', '__pycache__'] or not ispkg:
-            continue
+    Args:
+        category: The category to filter by.
         
-        try:
-            # Import the module
-            module_name = f"app.plugins.{name}"
-            importlib.import_module(module_name)
-            logger.info(f"Discovered plugin module: {module_name}")
-        except Exception as e:
-            logger.error(f"Error loading plugin module {name}: {str(e)}")
+    Returns:
+        A dictionary mapping plugin IDs to plugin classes for the given category.
+    """
+    return {
+        plugin_id: plugin_class
+        for plugin_id, plugin_class in _plugin_registry.items()
+        if plugin_class().category == category
+    }
 
-# Auto-discover plugins when the registry is imported
-discover_plugins()
+
+def get_plugin_categories() -> List[str]:
+    """
+    Gets a list of all plugin categories.
+    
+    Returns:
+        A list of unique plugin categories.
+    """
+    return list(set(plugin_class().category for plugin_class in _plugin_registry.values()))
