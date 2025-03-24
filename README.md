@@ -1,206 +1,105 @@
 # Construction AI Platform
 
-A comprehensive platform for construction document analysis, element extraction, and quote generation powered by AI.
+An AI-powered platform for the construction industry, focused on improving workflows and automating tedious tasks.
 
 ## Features
 
-- **Document Analysis**: Upload and analyze construction plans and specifications using AI
-- **Element Extraction**: Automatically extract construction elements, materials, and specifications
-- **Quote Generation**: Create detailed quotes based on the extracted elements
-- **Project Management**: Organize documents, elements, and quotes by project
-- **Client Management**: Track client information and manage client-specific quotes
-- **Specialized Plugins**: Extend functionality with trade-specific analysis tools
-- **Subscription Management**: Flexible subscription plans with usage tracking and plugin licensing
+- **MEP Plugins**: Analyze Mechanical, Electrical, and Plumbing specifications to extract structured data
+  - Electrical Systems Estimator
+  - Plumbing Systems Estimator
+  - HVAC & Mechanical Estimator
 
-## Specialized Plugin Modules
+## Architecture
 
-The platform offers a comprehensive suite of specialized plugins to enhance analysis capabilities:
+The platform is built with a modular, plugin-based architecture:
 
-### Architectural Estimating
-- Walls and Partitions Estimator
-- Doors and Windows Quantifier
-- Flooring and Ceilings Module
-- Paint and Finishes Calculator
-- Millwork and Cabinetry Estimator
+- **Backend**: FastAPI-based Python API with plugin system
+- **Frontend**: (Coming soon) React-based web application
 
-### Structural Estimating
-- Concrete Structures Plugin
-- Steel Structures Module
-- Wood & Timber Structures Plugin
-- Masonry & Brickwork Estimator
-- Foundations & Footings Analyzer
-
-### MEP (Mechanical, Electrical, Plumbing) Estimating
-- Electrical Systems Estimator (load calculation, wiring, fixtures, etc.)
-- Plumbing Systems Estimator (piping, fixtures, drainage, etc.)
-- HVAC & Mechanical Estimator (equipment, ductwork, controls, etc.)
-- Fire Protection Systems Plugin
-
-### Additional Specialized Plugins
-- Site Work & Civil Estimating
-- Building Envelope Estimating
-- Specialty Equipment Estimating
-- Green Building & Sustainability Analysis
-
-## Pricing
-
-### Subscription Plans
-
-| Plan | Description | Price |
-|------|-------------|-------|
-| **Free** | 1 PDF per month | Free |
-| **Starter** | 5 PDFs per month | $49/month |
-| **Essential** | 10 documents (PDF, CAD, BIM) | $129/month |
-| **Professional** | 20 documents per month | $249/month |
-| **Advanced** | 10 User Seats, 40 documents per month | $599/month |
-| **Ultimate** | Unlimited seats, custom document allowance | Contact Sales |
-
-### Add-Ons
-
-- **Specialized Plugins**: $99-$299 each
-- **Premium Setup & Training**: $499 one-time fee
-- **Annual Subscription**: 10-15% discount
-
-### Subscription Features
-
-- **Organization Management**: Create and manage organizations with multiple users
-- **Usage Tracking**: Monitor document uploads and analysis operations
-- **Plugin Licensing**: Purchase and manage plugin licenses
-- **Billing Management**: Flexible billing cycles (monthly/annual)
-- **Usage Reports**: Track usage and optimize subscription plans
-
-For detailed information about the subscription management system, see [Subscription Management Documentation](docs/subscription_management.md).
-
-## Technology Stack
-
-### Frontend
-- React.js
-- React Router for navigation
-- Tailwind CSS for styling
-- Axios for API communication
-
-### Backend (API)
-- FastAPI (Python)
-- PostgreSQL database
-- JWT authentication
-- AI document processing pipeline
-- Subscription management system
-
-## Installation
+## Getting Started
 
 ### Prerequisites
-- Node.js (v14+)
-- npm or yarn
-- Python 3.8+
-- PostgreSQL
 
-### Frontend Setup
+- Docker and Docker Compose
+- Python 3.11+
+- OpenAI API Key
+
+### Setup
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/RJ-Flash/construction-ai-platform.git
+   cd construction-ai-platform
+   ```
+
+2. Create a `.env` file from the example:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Edit the `.env` file to add your OpenAI API key and other settings.
+
+4. Start the services with Docker Compose:
+   ```bash
+   docker-compose up -d
+   ```
+
+5. Access the API at http://localhost:8000 and the API documentation at http://localhost:8000/docs
+
+### Running Without Docker
+
+1. Install backend dependencies:
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   ```
+
+2. Start the backend API:
+   ```bash
+   cd backend
+   uvicorn app.main:app --reload
+   ```
+
+## Testing
+
+Run the tests with pytest:
 
 ```bash
-# Clone the repository
-git clone https://github.com/RJ-Flash/construction-ai-platform.git
-cd construction-ai-platform/frontend
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env file with your configuration
-
-# Start development server
-npm start
+cd backend
+pytest
 ```
 
-### Backend Setup
+## Adding New Plugins
 
-```bash
-# Navigate to backend directory
-cd ../backend
+1. Create a new plugin class inheriting from the appropriate base class
+2. Implement the required methods
+3. Register the plugin using the `@register_plugin` decorator
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+Example:
 
-# Install dependencies
-pip install -r requirements.txt
+```python
+from app.plugins.mep.base import MEPPlugin
+from app.plugins.registry import register_plugin
 
-# Set up environment variables
-cp .env.example .env
-# Edit .env file with your configuration
-
-# Run migrations
-alembic upgrade head
-
-# Start development server
-uvicorn app.main:app --reload
+@register_plugin
+class MyNewPlugin(MEPPlugin):
+    @property
+    def id(self) -> str:
+        return "mep.my_new_plugin"
+    
+    @property
+    def name(self) -> str:
+        return "My New Plugin"
+    
+    # ... implement other required methods
 ```
 
-## Project Structure
+## API Documentation
 
-```
-├── frontend/
-│   ├── public/
-│   └── src/
-│       ├── components/      # Reusable UI components
-│       ├── config/          # Configuration files
-│       ├── contexts/        # React context providers
-│       ├── hooks/           # Custom React hooks
-│       ├── pages/           # Page components
-│       ├── styles/          # Global styles
-│       ├── utils/           # Utility functions
-│       ├── App.js           # Main application component
-│       └── index.js         # Entry point
-│
-└── backend/
-    ├── app/
-    │   ├── api/             # API routes
-    │   ├── core/            # Core functionality
-    │   ├── db/              # Database models and migrations
-    │   ├── services/        # Business logic
-    │   ├── plugins/         # Specialized estimating plugins
-    │   └── main.py          # Application entry point
-    ├── alembic/             # Database migrations
-    ├── docs/                # Project documentation 
-    ├── tests/               # Unit and integration tests
-    └── requirements.txt     # Python dependencies
-```
-
-## Key Components
-
-### Document Analysis Page
-- Upload construction documents
-- View analysis progress
-- Display extracted elements and specifications
-
-### Elements Management
-- View all extracted elements
-- Filter by type, material, and other properties
-- Edit and annotate elements
-
-### Quote Generator
-- Select elements to include in quotes
-- Customize pricing and quantities
-- Add client information and notes
-- Generate professional quote PDFs
-
-### Plugin Management
-- Install and manage specialized estimating plugins
-- Apply trade-specific analysis to projects
-- Enhanced accuracy for specialized construction fields
-
-### Subscription Management
-- Organization dashboard for subscription status
-- Usage monitoring and reporting
-- Plugin license management
-- User seat management
+Once running, access the API documentation at:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
 ## License
 
-[MIT License](LICENSE)
-
-## About
-
-The Construction AI Platform is designed to help construction professionals automate the tedious process of analyzing construction documents, extracting relevant elements, and creating accurate quotes. By leveraging AI technology, the platform reduces the time spent on manual calculations and data entry, allowing construction firms to focus on delivering high-quality work to their clients.
-
-The subscription management system provides flexible pricing options to suit construction firms of all sizes, from small contractors to large enterprises. Organizations can select the plan that best fits their needs and scale up as their requirements grow.
+This project is licensed under the MIT License - see the LICENSE file for details.
