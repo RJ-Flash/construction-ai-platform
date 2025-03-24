@@ -1,150 +1,188 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
+from sqlalchemy.orm import Session
+from sqlalchemy import func, distinct
 
-from app.api import deps
-from app.db.models.user import User
-from app.schemas.project import ProjectCreate, ProjectResponse, ProjectUpdate
-from app.services.project import project_service
+from ...db.database import get_db
+from ...db.models import Project, Document, Element, Quote, User
+from ...schemas import (
+    Project as ProjectSchema, 
+    ProjectCreate, 
+    ProjectUpdate, 
+    ProjectList,
+    ProjectDetail,
+    ProjectStats,
+    User as UserSchema
+)
+from ...core.auth import get_current_active_user
 
 router = APIRouter()
 
-@router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
-def create_project(
-    *,
-    db: Session = Depends(deps.get_db),
-    project_in: ProjectCreate,
-    current_user: User = Depends(deps.get_current_user)
+@router.get("/", response_model=List[ProjectList])
+async def read_projects(
+    skip: int = 0, 
+    limit: int = 100,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: UserSchema = Depends(get_current_active_user)
+):
+    """
+    Retrieve all projects accessible by the current user.
+    """
+    query = db.query(Project).filter(
+        (Project.owner_id == current_user.id) | 
+        (Project.users.any(User.id == current_user.id))
+    )
+    
+    if status:
+        query = query.filter(Project.status == status)
+        
+    projects = query.offset(skip).limit(limit).all()
+    return projects
+
+@router.post("/", response_model=ProjectSchema, status_code=status.HTTP_201_CREATED)
+async def create_project(
+    project: ProjectCreate,
+    db: Session = Depends(get_db),
+    current_user: UserSchema = Depends(get_current_active_user)
 ):
     """
     Create a new project.
     """
-    return project_service.create_project(db=db, project_in=project_in, user_id=current_user.id)
+    db_project = Project(**project.dict(), owner_id=current_user.id)
+    db.add(db_project)
+    db.commit()
+    db.refresh(db_project)
+    return db_project
 
-@router.get("/", response_model=List[ProjectResponse])
-def get_projects(
-    *,
-    db: Session = Depends(deps.get_db),
-    status: Optional[str] = Query(None, description="Filter by project status"),
-    skip: int = 0,
-    limit: int = 100,
-    current_user: User = Depends(deps.get_current_user)
-):
-    """
-    Get list of projects.
-    """
-    if current_user.role == "admin":
-        # Admins can see all projects
-        return project_service.get_projects(db=db, status=status, skip=skip, limit=limit)
-    else:
-        # Regular users can only see their own projects
-        return project_service.get_user_projects(
-            db=db, user_id=current_user.id, status=status, skip=skip, limit=limit
-        )
-
-@router.get("/{project_id}", response_model=ProjectResponse)
-def get_project(
-    *,
-    db: Session = Depends(deps.get_db),
+@router.get("/{project_id}", response_model=ProjectDetail)
+async def read_project(
     project_id: int,
-    current_user: User = Depends(deps.get_current_user)
+    db: Session = Depends(get_db),
+    current_user: UserSchema = Depends(get_current_active_user)
 ):
     """
-    Get project by ID.
+    Get details of a specific project.
     """
-    project = project_service.get_project(db=db, project_id=project_id)
+    project = db.query(Project).filter(Project.id == project_id).first()
+    
     if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found"
-        )
-    
+        raise HTTPException(status_code=404, detail="Project not found")
+        
     # Check if user has access to the project
-    if current_user.role != "admin" and project.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions"
-        )
+    if project.owner_id != current_user.id and current_user.id not in [user.id for user in project.users]:
+        raise HTTPException(status_code=403, detail="Not authorized to access this project")
     
-    return project
+    # Get counts for details
+    document_count = db.query(func.count(Document.id)).filter(Document.project_id == project_id).scalar() or 0
+    element_count = db.query(func.count(Element.id)).filter(Element.project_id == project_id).scalar() or 0
+    quote_count = db.query(func.count(Quote.id)).filter(Quote.project_id == project_id).scalar() or 0
+    
+    result = ProjectDetail.from_orm(project)
+    result.document_count = document_count
+    result.element_count = element_count
+    result.quote_count = quote_count
+    
+    return result
 
-@router.put("/{project_id}", response_model=ProjectResponse)
-def update_project(
-    *,
-    db: Session = Depends(deps.get_db),
+@router.put("/{project_id}", response_model=ProjectSchema)
+async def update_project(
     project_id: int,
-    project_in: ProjectUpdate,
-    current_user: User = Depends(deps.get_current_user)
+    project_update: ProjectUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserSchema = Depends(get_current_active_user)
 ):
     """
-    Update project information.
+    Update a project.
     """
-    project = project_service.get_project(db=db, project_id=project_id)
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found"
-        )
+    db_project = db.query(Project).filter(Project.id == project_id).first()
     
-    # Check if user has access to the project
-    if current_user.role != "admin" and project.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions"
-        )
+    if not db_project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    # Check if user is the owner
+    if db_project.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this project")
     
-    project = project_service.update_project(db=db, project=project, project_in=project_in)
-    return project
+    # Update fields if provided
+    for field, value in project_update.dict(exclude_unset=True).items():
+        setattr(db_project, field, value)
+    
+    db.commit()
+    db.refresh(db_project)
+    
+    return db_project
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_project(
-    *,
-    db: Session = Depends(deps.get_db),
+async def delete_project(
     project_id: int,
-    current_user: User = Depends(deps.get_current_user)
+    db: Session = Depends(get_db),
+    current_user: UserSchema = Depends(get_current_active_user)
 ):
     """
     Delete a project.
     """
-    project = project_service.get_project(db=db, project_id=project_id)
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found"
-        )
+    db_project = db.query(Project).filter(Project.id == project_id).first()
     
-    # Check if user has access to the project
-    if current_user.role != "admin" and project.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions"
-        )
+    if not db_project:
+        raise HTTPException(status_code=404, detail="Project not found")
         
-    project_service.delete_project(db=db, project_id=project_id)
+    # Check if user is the owner
+    if db_project.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this project")
+    
+    db.delete(db_project)
+    db.commit()
+    
     return None
 
-@router.get("/{project_id}/summary", response_model=dict)
-def get_project_summary(
-    *,
-    db: Session = Depends(deps.get_db),
+@router.get("/{project_id}/stats", response_model=ProjectStats)
+async def get_project_stats(
     project_id: int,
-    current_user: User = Depends(deps.get_current_user)
+    db: Session = Depends(get_db),
+    current_user: UserSchema = Depends(get_current_active_user)
 ):
     """
-    Get project summary including document count, element count, and estimation totals.
+    Get statistics for a project.
     """
-    project = project_service.get_project(db=db, project_id=project_id)
+    project = db.query(Project).filter(Project.id == project_id).first()
+    
     if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found"
-        )
-    
+        raise HTTPException(status_code=404, detail="Project not found")
+        
     # Check if user has access to the project
-    if current_user.role != "admin" and project.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions"
-        )
+    if project.owner_id != current_user.id and current_user.id not in [user.id for user in project.users]:
+        raise HTTPException(status_code=403, detail="Not authorized to access this project")
     
-    return project_service.get_project_summary(db=db, project_id=project_id)
+    # Get document stats
+    total_documents = db.query(func.count(Document.id)).filter(Document.project_id == project_id).scalar() or 0
+    analyzed_documents = db.query(func.count(Document.id)).filter(
+        Document.project_id == project_id,
+        Document.is_analyzed == True
+    ).scalar() or 0
+    
+    # Get element stats
+    total_elements = db.query(func.count(Element.id)).filter(Element.project_id == project_id).scalar() or 0
+    
+    # Get quote stats
+    quotes_by_status = {}
+    for status_name in ["draft", "sent", "accepted", "declined"]:
+        count = db.query(func.count(Quote.id)).filter(
+            Quote.project_id == project_id,
+            Quote.status == status_name
+        ).scalar() or 0
+        quotes_by_status[status_name] = count
+    
+    # Get total quote value
+    total_value = db.query(func.sum(Quote.total_amount)).filter(
+        Quote.project_id == project_id,
+        Quote.status.in_(["accepted", "sent"])
+    ).scalar() or 0
+    
+    return ProjectStats(
+        total_documents=total_documents,
+        analyzed_documents=analyzed_documents,
+        total_elements=total_elements,
+        quotes_count=quotes_by_status,
+        total_value=total_value
+    )
