@@ -9,6 +9,56 @@ A comprehensive platform for construction document analysis, element extraction,
 - **Quote Generation**: Create detailed quotes based on the extracted elements
 - **Project Management**: Organize documents, elements, and quotes by project
 - **Client Management**: Track client information and manage client-specific quotes
+- **Specialized Plugins**: Extend functionality with trade-specific analysis tools
+
+## Specialized Plugin Modules
+
+The platform offers a comprehensive suite of specialized plugins to enhance analysis capabilities:
+
+### Architectural Estimating
+- Walls and Partitions Estimator
+- Doors and Windows Quantifier
+- Flooring and Ceilings Module
+- Paint and Finishes Calculator
+- Millwork and Cabinetry Estimator
+
+### Structural Estimating
+- Concrete Structures Plugin
+- Steel Structures Module
+- Wood & Timber Structures Plugin
+- Masonry & Brickwork Estimator
+- Foundations & Footings Analyzer
+
+### MEP (Mechanical, Electrical, Plumbing) Estimating
+- Electrical Systems Estimator (load calculation, wiring, fixtures, etc.)
+- Plumbing Systems Estimator (piping, fixtures, drainage, etc.)
+- HVAC & Mechanical Estimator (equipment, ductwork, controls, etc.)
+- Fire Protection Systems Plugin
+
+### Additional Specialized Plugins
+- Site Work & Civil Estimating
+- Building Envelope Estimating
+- Specialty Equipment Estimating
+- Green Building & Sustainability Analysis
+
+## Pricing
+
+### Subscription Plans
+
+| Plan | Description | Price |
+|------|-------------|-------|
+| **Free** | 1 PDF per month | Free |
+| **Starter** | 5 PDFs per month | $49/month |
+| **Essential** | 10 documents (PDF, CAD, BIM) | $129/month |
+| **Professional** | 20 documents per month | $249/month |
+| **Advanced** | 5 User Seats, 10 documents per month | $599/month |
+| **Ultimate** | Unlimited seats, custom document allowance | Contact Sales |
+
+### Add-Ons
+
+- **Specialized Plugins**: $99-$299 each
+- **Premium Setup & Training**: $499 one-time fee
+- **Annual Subscription**: 10-15% discount
 
 ## Technology Stack
 
@@ -96,6 +146,7 @@ uvicorn app.main:app --reload
     │   ├── core/            # Core functionality
     │   ├── db/              # Database models and migrations
     │   ├── services/        # Business logic
+    │   ├── plugins/         # Specialized estimating plugins
     │   └── main.py          # Application entry point
     ├── alembic/             # Database migrations
     └── requirements.txt     # Python dependencies
@@ -118,6 +169,11 @@ uvicorn app.main:app --reload
 - Customize pricing and quantities
 - Add client information and notes
 - Generate professional quote PDFs
+
+### Plugin Management
+- Install and manage specialized estimating plugins
+- Apply trade-specific analysis to projects
+- Enhanced accuracy for specialized construction fields
 
 ## License
 
