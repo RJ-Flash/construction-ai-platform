@@ -4,6 +4,7 @@ from sqlalchemy.sql import func
 import enum
 from datetime import datetime
 from .database import Base
+from .models.subscription_models import PlanType, Organization, Subscription, PluginLicense, UsageRecord
 
 # Association tables
 project_users = Table(
@@ -30,12 +31,16 @@ class User(Base):
     full_name = Column(String, nullable=True)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
+    organization = relationship("Organization", back_populates="users")
     projects = relationship("Project", secondary=project_users, back_populates="users")
     owned_projects = relationship("Project", back_populates="owner", foreign_keys="Project.owner_id")
+    usage_records = relationship("UsageRecord", back_populates="user")
 
 # Project model
 class Project(Base):
@@ -49,10 +54,12 @@ class Project(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     owner_id = Column(Integer, ForeignKey("users.id"))
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
 
     # Relationships
     owner = relationship("User", back_populates="owned_projects", foreign_keys=[owner_id])
     users = relationship("User", secondary=project_users, back_populates="projects")
+    organization = relationship("Organization")
     documents = relationship("Document", back_populates="project")
     elements = relationship("Element", back_populates="project")
     quotes = relationship("Quote", back_populates="project")
@@ -70,9 +77,11 @@ class Client(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
 
     # Relationships
     project = relationship("Project")
+    organization = relationship("Organization")
     quotes = relationship("Quote", back_populates="client")
 
 # Document model
@@ -90,11 +99,14 @@ class Document(Base):
     upload_date = Column(DateTime, default=datetime.utcnow)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
     uploaded_by = Column(Integer, ForeignKey("users.id"))
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
 
     # Relationships
     project = relationship("Project", back_populates="documents")
+    organization = relationship("Organization")
     elements = relationship("Element", back_populates="document")
     specifications = relationship("DocumentSpecification", back_populates="document")
+    usage_records = relationship("UsageRecord", back_populates="document")
 
 # DocumentSpecification model
 class DocumentSpecification(Base):
@@ -152,10 +164,12 @@ class Quote(Base):
     project_id = Column(Integer, ForeignKey("projects.id"))
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"))
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
 
     # Relationships
     project = relationship("Project", back_populates="quotes")
     client = relationship("Client", back_populates="quotes")
+    organization = relationship("Organization")
     items = relationship("QuoteItem", back_populates="quote", cascade="all, delete-orphan")
     activities = relationship("QuoteActivity", back_populates="quote", cascade="all, delete-orphan")
 
