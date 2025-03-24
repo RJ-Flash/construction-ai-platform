@@ -1,23 +1,32 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+"""
+Main Application
+
+This module contains the main FastAPI application.
+"""
+import logging
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import os
-from typing import List, Optional
 
-from .api.api import api_router
-from .core.config import settings
-from .db.database import engine, Base
+from app.api import api_router
 
-# Initialize FastAPI app
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# Create FastAPI app
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    description=settings.PROJECT_DESCRIPTION,
-    version=settings.PROJECT_VERSION,
+    title="Construction AI Platform",
+    description="API for the Construction AI Platform",
+    version="0.1.0",
 )
 
-# CORS configuration
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=["*"],  # In production, restrict to specific origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,21 +35,27 @@ app.add_middleware(
 # Include API router
 app.include_router(api_router, prefix="/api")
 
-# Health check endpoint
-@app.get("/health")
-def health_check():
+
+@app.get("/")
+async def root():
+    """
+    Root endpoint.
+    """
     return {
-        "status": "healthy",
-        "version": settings.PROJECT_VERSION
+        "message": "Welcome to the Construction AI Platform API",
+        "docs_url": "/docs",
     }
 
-# Create database tables
-@app.on_event("startup")
-async def startup_event():
-    # In production, use Alembic migrations instead of creating tables directly
-    # This is just for development convenience
-    Base.metadata.create_all(bind=engine)
 
+@app.get("/health")
+async def health():
+    """
+    Health check endpoint.
+    """
+    return {"status": "healthy"}
+
+
+# This block is required for running the app with uvicorn directly
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
