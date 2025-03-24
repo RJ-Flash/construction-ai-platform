@@ -1,0 +1,50 @@
+# FastAPI and dependencies
+fastapi>=0.95.0
+uvicorn>=0.21.1
+python-multipart>=0.0.6
+pydantic>=1.10.7
+pydantic-settings>=2.0.0
+email-validator>=2.0.0
+
+# Database
+sqlalchemy>=2.0.9
+alembic>=1.10.3
+mysql-connector-python>=8.0.32
+pymysql>=1.0.3
+
+# Security
+python-jose>=3.3.0
+passlib>=1.7.4
+bcrypt>=4.0.1
+
+# AI/ML dependencies
+tensorflow>=2.12.0
+pylsd-nova>=1.2.0
+opencv-python>=4.7.0.72
+pytesseract>=0.3.10
+numpy>=1.23.5
+pandas>=2.0.0
+scipy>=1.10.1
+matplotlib>=3.7.1
+
+# File handling
+python-magic>=0.4.27
+pyodbc>=4.0.39
+
+# PDF processing
+pypdf2>=3.0.1
+reportlab>=3.6.13
+
+# CAD/BIM processing
+IfcOpenShell>=0.7.0
+oom-linalg>=0.6.12
+
+# Testing
+pytest>=7.3.1
+pytest-cov>=4.1.0
+
+# Utilities
+python-dotenv>=1.0.0
+tenacity>=8.2.2
+jinja2>=3.1.2
+aiofiles>=23.1.0
