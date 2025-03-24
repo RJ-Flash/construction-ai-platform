@@ -119,6 +119,32 @@ def delete_project(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"
         )
-    
+        
     project_service.delete_project(db=db, project_id=project_id)
     return None
+
+@router.get("/{project_id}/summary", response_model=dict)
+def get_project_summary(
+    *,
+    db: Session = Depends(deps.get_db),
+    project_id: int,
+    current_user: User = Depends(deps.get_current_user)
+):
+    """
+    Get project summary including document count, element count, and estimation totals.
+    """
+    project = project_service.get_project(db=db, project_id=project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+    
+    # Check if user has access to the project
+    if current_user.role != "admin" and project.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions"
+        )
+    
+    return project_service.get_project_summary(db=db, project_id=project_id)
