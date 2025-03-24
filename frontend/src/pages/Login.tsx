@@ -105,13 +105,14 @@ const Login = () => {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="password">Password</Label>
-              <Button variant="link" className="px-0 text-xs" disabled>
+              <Link to="/forgot-password" className="text-sm text-primary hover:underline">
                 Forgot password?
-              </Button>
+              </Link>
             </div>
             <Input
               id="password"
               type="password"
+              placeholder="••••••••"
               {...register('password')}
             />
             {errors.password && (
@@ -120,16 +121,16 @@ const Login = () => {
           </div>
           
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? 'Logging in...' : 'Login'}
           </Button>
         </form>
       </CardContent>
       
       <CardFooter className="flex justify-center">
-        <p className="text-sm text-muted-foreground">
-          Don&apos;t have an account?{' '}
+        <p className="text-sm text-center text-muted-foreground">
+          Don't have an account?{' '}
           <Link to="/register" className="text-primary hover:underline">
-            Sign up
+            Register
           </Link>
         </p>
       </CardFooter>
