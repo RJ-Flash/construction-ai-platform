@@ -3,7 +3,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 
-# Plan type enum
+# Subscription plan enum
 class PlanType(str, Enum):
     FREE = "free"
     STARTER = "starter"
@@ -12,51 +12,46 @@ class PlanType(str, Enum):
     ADVANCED = "advanced"
     ULTIMATE = "ultimate"
 
-# Organization schemas
+# Organization base model
 class OrganizationBase(BaseModel):
     name: str
     email: EmailStr
     phone: Optional[str] = None
     address: Optional[str] = None
 
+# Organization create model
 class OrganizationCreate(OrganizationBase):
     pass
 
-class OrganizationUpdate(BaseModel):
-    name: Optional[str] = None
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
-    address: Optional[str] = None
-
-class OrganizationInDBBase(OrganizationBase):
+# Organization in DB
+class Organization(OrganizationBase):
     id: int
     created_at: datetime
     updated_at: datetime
-
+    
     class Config:
         orm_mode = True
 
-class Organization(OrganizationInDBBase):
-    pass
-
-# Subscription schemas
+# Subscription base model
 class SubscriptionBase(BaseModel):
-    plan_type: PlanType = PlanType.FREE
+    plan_type: PlanType
     is_active: bool = True
     is_trial: bool = False
-    max_users: int = 1
-    max_documents: int = 1
+    max_users: int
+    max_documents: int
     documents_used: int = 0
-    price: float = 0.0
-    billing_cycle: str = "monthly"
+    price: float
+    billing_cycle: str  # monthly or annual
     payment_method: Optional[str] = None
     payment_id: Optional[str] = None
 
+# Subscription create model
 class SubscriptionCreate(SubscriptionBase):
     organization_id: int
     start_date: datetime = datetime.utcnow()
     end_date: Optional[datetime] = None
 
+# Subscription update model
 class SubscriptionUpdate(BaseModel):
     plan_type: Optional[PlanType] = None
     is_active: Optional[bool] = None
@@ -70,35 +65,35 @@ class SubscriptionUpdate(BaseModel):
     payment_id: Optional[str] = None
     end_date: Optional[datetime] = None
 
-class SubscriptionInDBBase(SubscriptionBase):
+# Subscription in DB
+class Subscription(SubscriptionBase):
     id: int
     organization_id: int
     start_date: datetime
-    end_date: Optional[datetime]
+    end_date: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
-
+    
     class Config:
         orm_mode = True
 
-class Subscription(SubscriptionInDBBase):
-    pass
-
-# Plugin license schemas
+# Plugin license base model
 class PluginLicenseBase(BaseModel):
     plugin_id: str
     plugin_name: str
-    license_key: str
     is_active: bool = True
-    price: float = 0.0
-    billing_cycle: str = "one-time"
-    payment_id: Optional[str] = None
+    price: float
+    billing_cycle: str  # one-time, monthly, annual
 
+# Plugin license create model
 class PluginLicenseCreate(PluginLicenseBase):
     organization_id: int
     purchase_date: datetime = datetime.utcnow()
     expiry_date: Optional[datetime] = None
+    license_key: Optional[str] = None
+    payment_id: Optional[str] = None
 
+# Plugin license update model
 class PluginLicenseUpdate(BaseModel):
     is_active: Optional[bool] = None
     expiry_date: Optional[datetime] = None
@@ -106,43 +101,47 @@ class PluginLicenseUpdate(BaseModel):
     billing_cycle: Optional[str] = None
     payment_id: Optional[str] = None
 
-class PluginLicenseInDBBase(PluginLicenseBase):
+# Plugin license in DB
+class PluginLicense(PluginLicenseBase):
     id: int
     organization_id: int
+    license_key: str
     purchase_date: datetime
-    expiry_date: Optional[datetime]
-
+    expiry_date: Optional[datetime] = None
+    payment_id: Optional[str] = None
+    
     class Config:
         orm_mode = True
 
-class PluginLicense(PluginLicenseInDBBase):
-    pass
-
-# Usage record schemas
+# Usage record base model
 class UsageRecordBase(BaseModel):
     organization_id: int
     user_id: int
+    action_type: str  # document_upload, document_analysis, plugin_usage
     document_id: Optional[int] = None
     plugin_id: Optional[str] = None
-    action_type: str
     details: Optional[str] = None
 
+# Usage record create model
 class UsageRecordCreate(UsageRecordBase):
-    pass
+    timestamp: datetime = datetime.utcnow()
 
-class UsageRecordInDBBase(UsageRecordBase):
+# Usage record in DB
+class UsageRecord(UsageRecordBase):
     id: int
     timestamp: datetime
-
+    
     class Config:
         orm_mode = True
 
-class UsageRecord(UsageRecordInDBBase):
-    pass
+# Organization with subscription
+class OrganizationWithSubscription(Organization):
+    subscription: Optional[Subscription] = None
+    plugins: List[PluginLicense] = []
 
-# Plan details schema
-class PlanDetails(BaseModel):
-    type: PlanType
+# Subscription plan info
+class SubscriptionPlanInfo(BaseModel):
+    plan_type: PlanType
     name: str
     description: str
     price_monthly: float
@@ -150,29 +149,19 @@ class PlanDetails(BaseModel):
     max_users: int
     max_documents: int
     features: List[str]
-    recommended_for: str
+    plugin_discounts: Dict[str, float] = {}
 
-# Subscription with organization
-class SubscriptionWithOrg(Subscription):
+# Plan usage info
+class PlanUsageInfo(BaseModel):
+    documents_used: int
+    documents_total: int
+    documents_percentage: float
+    users_used: int
+    users_total: int
+    users_percentage: float
+    active_plugins: List[str] = []
+
+# Subscription with usage
+class SubscriptionWithUsage(Subscription):
+    usage: PlanUsageInfo
     organization: Organization
-
-# Organization with subscription and plugins
-class OrganizationWithDetails(Organization):
-    subscription: Optional[Subscription] = None
-    plugins: List[PluginLicense] = []
-
-# Plugin purchase request
-class PluginPurchaseRequest(BaseModel):
-    plugin_id: str
-    organization_id: int
-    billing_cycle: str = "one-time"
-    payment_method: str
-    payment_details: Dict[str, Any]
-
-# Subscription change request
-class SubscriptionChangeRequest(BaseModel):
-    organization_id: int
-    new_plan_type: PlanType
-    billing_cycle: str = "monthly"
-    payment_method: str
-    payment_details: Dict[str, Any]
